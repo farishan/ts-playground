@@ -4,57 +4,67 @@
  * 2. Controller component. As a player, I should be able to input something so that I can interact with the game. 'Input component'/'GameInput component'?
  */
 
+/**
+ * Open-Closed Principle
+ * requires that classes should be open for extension and closed to modification.
+ */
+
+import type { Constructor } from "./libs/Constructor"
+
+import { MemoryManager } from "./MemoryManager"
 import { Plugin } from "./Plugin.type"
+import { PluginKeyboard } from "./PluginKeyboard"
+import { Commander } from "./libs/Commander"
+import { Controller } from "./libs/Controller"
+// import { PluginLogger } from "./PluginLogger"
+import windowEventProxy from "./libs/windowEventProxy"
 
-export class Game {
-  listeners: Function[] = []
-  view = {
-    get() {
-      const root = document.createElement('div')
-      root.innerHTML = 'hello. check console and type something'
-      return root
+const GameBase = Controller(Commander);
+
+function GameMixin<TBase extends Constructor>(Base: TBase) {
+  return class ExtendedGame extends Base {
+    memoryManager = new MemoryManager()
+    listeners: Function[] = []
+
+    constructor(...rest: any[]) {
+      super(...rest)
+      this.memoryManager.set('game_name', 'test')
+      console.log(this.memoryManager.get('game_name'))
+
+      // this.listeners = []
+      windowEventProxy.debug()
+
+      /* set built-in plugins */
+      new PluginKeyboard().addListener('keypress', (e: KeyboardEvent) => {
+        this.execute(e.key)
+      })
+
+      // new PluginLogger()
     }
-  }
 
-  constructor() {
-    // this.listeners = []
-  }
-
-  exec(command: string) {
-    if (command === '`') {
-      
-    } else {
-      console.log('unknown command. try tilde key')
+    log(message: string) {
+      console.log(message)
     }
 
-    for (let index = 0; index < this.listeners.length; index++) {
-      const listener = this.listeners[index];
-      listener(command, this)
+    addListener(listener: Function) {
+      this.listeners.push(listener)
+      console.log('listener added.')
     }
-  }
 
-  log(message: string) {
-    console.log(message)
-  }
+    /* how to type this? */
+    use(Plugin: any, callback?: Function) {
+      const plugin = new Plugin()
+      console.log('plugged in:', plugin)
 
-  addListener(listener: Function) {
-    this.listeners.push(listener)
-    console.log('listener added.')
-  }
+      this.addListener(plugin.observer)
 
-  /* how to type this? */
-  use(Plugin: any) {
-    const p = new Plugin()
-    console.log(p)
+      if (callback) callback(this, plugin)
+    }
 
-      this.addListener(p.observer)
-  }
-
-  run(p: Plugin) {
-    p.run(this)
-  }
-
-  getView() {
-    return this.view.get()
-  }
+    run(p: Plugin) {
+      p.run(this)
+    }
+  };
 }
+
+export const Game = GameMixin(GameBase)
